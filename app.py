@@ -6,9 +6,10 @@ import json
 from apscheduler.schedulers.background import BackgroundScheduler  # scheduling tasks to run at regular intervals
 import easyocr  # Optical Character Recognition library for extracting text from images
 from transformers import pipeline  # Hugging Face pipeline for summarization
-import warnings
 import re
 import datetime
+from textblob import TextBlob
+import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -76,27 +77,17 @@ def analyze_screenshot(screenshot_path):
     
     return analysis_report
 
-# Function to preprocess and summarize text
-'''def preprocess_text(text):
-    # Clean up the text by removing unnecessary patterns
-    # Remove file paths or words that look like file paths (e.g., 'C:/Users/...')
-    text = re.sub(r'([a-zA-Z]:[\\/][\w\s\\.]+)', '', text)
-    
-    # Remove lines with numbers, special characters, or debug info
-    text = re.sub(r'[0-9]+[:;]', '', text)  # Removes sequences like '40PC 1-.23'
-    
-    # Remove excessive whitespace and line breaks
-    text = re.sub(r'\s+', ' ', text).strip()
-    
-    # Remove unnecessary words or symbols (you can add more patterns if needed)
-    text = re.sub(r'DEBUG|Slnn;|ce}|AM', '', text, flags=re.IGNORECASE)
-    
-    return text'''
 
 def preprocess_text(text):
-    # Clean up the text
-    cleaned_text = re.sub(r'\s+', ' ', text).strip()  # Replace multiple spaces with a single space
-    return cleaned_text
+    # Remove URLs and query parameters
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)  # Remove URLs
+    text = re.sub(r'\?.*$', '', text)  # Remove query parameters
+    
+    # Remove special characters and extra spaces
+    text = re.sub(r'[^\w\s]', '', text)  # Remove special characters
+    text = re.sub(r'\s+', ' ', text).strip()  # Replace multiple spaces with a single space
+    
+    return text
 
 def get_username():
     try:
@@ -107,7 +98,12 @@ def get_username():
         username = os.environ.get('USER') or os.environ.get('USERNAME') or 'User'
     return username
 
-# Function to generate a readable report
+def frame_sentence(text):
+    # Correct grammar and rephrase the text
+    blob = TextBlob(text)
+    corrected_text = blob.correct()
+    return str(corrected_text)
+
 def generate_readable_report(reports):
     formatted_entries = []
     username = get_username()  # Get the username
@@ -121,15 +117,20 @@ def generate_readable_report(reports):
         cleaned_text = preprocess_text(text)
 
         # Generate a detailed summary
-        summary_response = summarizer(cleaned_text, max_length=74, min_length=30, do_sample=False)
+        summary_response = summarizer(cleaned_text, max_length=150, min_length=50, do_sample=False)
         
         if summary_response:
             summarized_text = summary_response[0]['summary_text']
+            # Frame the sentence
+            framed_text = frame_sentence(summarized_text)
         else:
-            summarized_text = "Summary could not be generated."
+            framed_text = "Summary could not be generated."
 
-        # Format the report entry
-        formatted_entries.append(f"On {timestamp}:\nSummary: {username}, working with {summarized_text}\nTotal Time = {time_difference}\n")
+        # Reframe the sentence for readability
+        formatted_entry = (f"On {timestamp},\n {username} was reviewing information related to: {framed_text}.\n"
+                           f"Total time since the first report: {time_difference}.")
+        
+        formatted_entries.append(formatted_entry)
     
     # Join all entries with new lines
     readable_report = "\n".join(formatted_entries)
@@ -142,7 +143,6 @@ def generate_readable_report(reports):
         f.write(readable_report)
 
     print(f"Readable report saved at {summary_file}")
-
 
 # Function to process a screenshot and generate a report
 def process_screenshot():

@@ -4,3 +4,4 @@ pillow==10.4.0
 APScheduler==3.10.4
 easyocr==1.7.1
 transformers==4.44.2
+textblob==0.18.0.post0

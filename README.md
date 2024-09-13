@@ -1,3 +1,5 @@
+# For more accurate results, would recommend to use OPENAI (paid version), which can process image and directly anlyse it.
+
 # screenshot-analyzer
 
 This application takes screenshots at regular intervals, processes them using EasyOCR and a Hugging Face summarizer, and generates readable reports.
